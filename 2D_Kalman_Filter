@@ -1,0 +1,65 @@
+#include <iostream>
+#include <Eigen/Dense>
+
+class KalmanFilter2D {
+public:
+    KalmanFilter2D(const Eigen::Vector2d& initial_state_mean,
+                   const Eigen::Matrix2d& initial_state_covariance,
+                   const Eigen::Matrix2d& process_noise_covariance,
+                   const Eigen::Matrix2d& observation_noise_covariance)
+        : state_mean(initial_state_mean),
+          state_covariance(initial_state_covariance),
+          process_noise_covariance(process_noise_covariance),
+          observation_noise_covariance(observation_noise_covariance),
+          transition_matrix(Eigen::Matrix2d::Identity()),
+          observation_matrix(Eigen::Matrix2d::Identity()) {}
+
+    void predict() {
+        state_mean = transition_matrix * state_mean;
+        state_covariance = transition_matrix * state_covariance * transition_matrix.transpose() + process_noise_covariance;
+    }
+
+    void update(const Eigen::Vector2d& observation) {
+        Eigen::Vector2d innovation = observation - observation_matrix * state_mean;
+        Eigen::Matrix2d innovation_covariance = observation_matrix * state_covariance * observation_matrix.transpose() + observation_noise_covariance;
+        Eigen::Matrix2d kalman_gain = state_covariance * observation_matrix.transpose() * innovation_covariance.inverse();
+        
+        state_mean = state_mean + kalman_gain * innovation;
+        state_covariance = state_covariance - kalman_gain * observation_matrix * state_covariance;
+    }
+
+    const Eigen::Vector2d& get_state_mean() const {
+        return state_mean;
+    }
+
+private:
+    Eigen::Vector2d state_mean;
+    Eigen::Matrix2d state_covariance;
+    Eigen::Matrix2d process_noise_covariance;
+    Eigen::Matrix2d observation_noise_covariance;
+
+    Eigen::Matrix2d transition_matrix;
+    Eigen::Matrix2d observation_matrix;
+};
+
+int main() {
+    Eigen::Vector2d initial_state_mean(0, 0);
+    Eigen::Matrix2d initial_state_covariance = Eigen::Matrix2d::Identity();
+    Eigen::Matrix2d process_noise_covariance = 0.1 * Eigen::Matrix2d::Identity();
+    Eigen::Matrix2d observation_noise_covariance = 0.5 * Eigen::Matrix2d::Identity();
+
+    KalmanFilter2D kf(initial_state_mean, initial_state_covariance, process_noise_covariance, observation_noise_covariance);
+
+    // Simulate noisy observations
+    Eigen::Matrix<double, 2, 5> observations;
+    observations << 1, 2, 3, 4, 5,
+                    1, 0.9, 1.1, 0.95, 1.05;
+
+    for (int i = 0; i < observations.cols(); ++i) {
+        kf.predict();
+        kf.update(observations.col(i));
+        std::cout << "Observation:\n" << observations.col(i) << "\nFiltered value:\n" << kf.get_state_mean() << std::endl;
+    }
+
+    return 0;
+}
